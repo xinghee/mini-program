@@ -1,0 +1,556 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 划词助手 — 选中即知，朗读即听</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface2: #f1f5f9;
+  --border: rgba(0,0,0,0.08);
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent2: #8b5cf6;
+  --accent-glow: rgba(99,102,241,0.15);
+  --green: #10b981;
+  --amber: #f59e0b;
+  --radius: 12px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ===== Hero ===== */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 24px;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -40%; left: -20%;
+  width: 140%; height: 140%;
+  background:
+    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(99,102,241,0.08), transparent),
+    radial-gradient(ellipse 500px 350px at 70% 60%, rgba(139,92,246,0.06), transparent),
+    radial-gradient(ellipse 300px 300px at 50% 80%, rgba(16,185,129,0.05), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+.hero > * { position: relative; z-index: 1; }
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 28px;
+}
+.hero-badge span { font-weight: 600; }
+
+.hero-title {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #1e293b 0%, #4f46e5 40%, #6366f1 70%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  color: var(--text-muted);
+  max-width: 880px;
+  margin-bottom: 40px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.btn-primary {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+.btn-secondary {
+  padding: 14px 32px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-secondary:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+.hero-preview {
+  margin-top: 56px;
+  width: 100%;
+  max-width: 720px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+}
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+.preview-dot.r { background: #ef4444; }
+.preview-dot.y { background: #f59e0b; }
+.preview-dot.g { background: #10b981; }
+.preview-url {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 12px;
+  background: var(--surface2);
+  border-radius: 6px;
+  margin: 0 8px;
+}
+.preview-body {
+  padding: 32px;
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.8;
+  position: relative;
+}
+.preview-body .highlight {
+  background: rgba(99,102,241,0.2);
+  border-bottom: 2px solid var(--accent);
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+.preview-float {
+  position: absolute;
+  top: 60px; right: 24px;
+  background: var(--surface2);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  animation: floatIn 0.6s ease;
+}
+@keyframes floatIn {
+  from { opacity:0; transform: translateY(-8px) scale(0.95); }
+  to { opacity:1; transform: translateY(0) scale(1); }
+}
+.preview-float button {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.preview-float button:first-child {
+  background: var(--accent);
+  color: #fff;
+}
+.preview-float button:hover { background: rgba(99,102,241,0.2); }
+.preview-float button:first-child:hover { background: var(--accent2); }
+
+/* ===== Sections ===== */
+.section {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 16px;
+}
+.section-desc {
+  font-size: 16px;
+  color: var(--text-muted);
+  max-width: 580px;
+  margin-bottom: 48px;
+}
+
+/* ===== Feature Grid ===== */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.feature-card:hover { border-color: rgba(99,102,241,0.3); transform: translateY(-2px); }
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+.feature-icon.purple { background: rgba(99,102,241,0.12); }
+.feature-icon.green { background: rgba(16,185,129,0.12); }
+.feature-icon.amber { background: rgba(245,158,11,0.12); }
+.feature-icon.blue { background: rgba(59,130,246,0.12); }
+.feature-icon.rose { background: rgba(244,63,94,0.12); }
+.feature-icon.teal { background: rgba(20,184,166,0.12); }
+.feature-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.feature-card p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* ===== Steps ===== */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  max-width: 560px;
+}
+.steps::before {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 30px;
+  bottom: 30px;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--accent), var(--green));
+  border-radius: 1px;
+}
+.step {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 24px 0;
+}
+.step-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.step:nth-child(1) .step-num { background: rgba(99,102,241,0.12); color: #4f46e5; }
+.step:nth-child(2) .step-num { background: rgba(139,92,246,0.12); color: #7c3aed; }
+.step:nth-child(3) .step-num { background: rgba(16,185,129,0.12); color: #059669; }
+.step-content h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.step-content p { font-size: 14px; color: var(--text-muted); }
+
+/* ===== API Banner ===== */
+.api-banner {
+  background: linear-gradient(135deg, var(--surface) 0%, rgba(99,102,241,0.04) 100%);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: var(--radius);
+  padding: 40px 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: center;
+}
+.api-banner-text { flex: 1; min-width: 280px; }
+.api-banner-text h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.api-banner-text p { font-size: 14px; color: var(--text-muted); }
+.api-logos {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.api-logo {
+  padding: 8px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ===== Footer ===== */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.footer a { color: var(--accent); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  .hero { padding: 40px 16px; }
+  .section { padding: 48px 16px; }
+  .preview-float { right: 8px; top: 44px; }
+  .api-banner { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- ====== Hero ====== -->
+<section class="hero">
+  <h1 class="hero-title">AI 划词助手</h1>
+  <p class="hero-sub">1. 选中文字，一键翻译、总结、解释等自定义功能，推荐 deepseek-v4-flash。<br>2. 自定义任意大模型 API，key 只存本地。<br>3. 语音朗读功能，支持自动识别中英日韩等 14 种语言，选择对应的语音读给你听。<br>4. 新版还能为母语设置加速播放，让阅读跟上你的节奏，已提交审核即将上线…<br>5. 在 Windows 11 下开发，测试通过。</p>
+  <div class="hero-actions">
+    <a href="https://chromewebstore.google.com/detail/ai-%E5%88%92%E8%AF%8D%E5%8A%A9%E6%89%8B/nlenacppocdkmpbhnemaebljmgnfhbln?authuser=0&hl=zh-CN" class="btn-primary" target="_blank">安装扩展 →</a>
+    <a href="#features" class="btn-secondary">了解功能</a>
+  </div>
+
+  <!-- 模拟浏览器预览 -->
+  <div class="hero-preview">
+    <div class="preview-toolbar">
+      <div class="preview-dot r"></div>
+      <div class="preview-dot y"></div>
+      <div class="preview-dot g"></div>
+      <div class="preview-url">en.wikipedia.org</div>
+    </div>
+    <div class="preview-body">
+      <p>The <span class="highlight">quantum entanglement</span> is a phenomenon where two particles become interconnected, such that the quantum state of each particle cannot be described independently of the state of the other...</p>
+      <div class="preview-float">
+        <button>🌐 翻译</button>
+        <button>📝 总结</button>
+        <button>💡 解释</button>
+        <button>🔊 朗读</button>
+        <button style="font-size:10px">▼</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Features ====== -->
+<section class="section" id="features">
+  <div class="section-label">核心功能</div>
+  <h2 class="section-title">选中即知，朗读即听</h2>
+  <p class="section-desc">不到 1 秒，从划词到结果。不用切换页面，不用复制粘贴，就在当前页面完成一切。</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon purple">🌐</div>
+      <h3>智能翻译</h3>
+      <p>选中任何语言的文字，一键翻译为中文。AI 理解语境，不是逐字机翻，结果可直接使用。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon green">📝</div>
+      <h3>内容总结</h3>
+      <p>长文太长？3 句话提炼核心要点。论文、新闻、文档，一划即得精华。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon amber">💡</div>
+      <h3>即时解释</h3>
+      <p>遇到不懂的概念？选中即获通俗解释，适合初学者理解，告别"看了但没看懂"。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon blue">🔊</div>
+      <h3>语音朗读</h3>
+      <p>自动识别 14 种语言，智能匹配最佳语音。中文用中文声，英文用英文声，还支持母语加速播放。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon rose">⚡</div>
+      <h3>流式输出</h3>
+      <p>AI 回复边生成边显示，无需等待。Markdown 实时渲染，代码、表格、列表完美呈现。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon teal">🎨</div>
+      <h3>三种主题</h3>
+      <p>深色、浅色、黄底黑字，总有一款适合你。设置页跟随主题变色，视觉统一。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== API Compatible ====== -->
+<section class="section" id="api">
+  <div class="section-label">开放兼容</div>
+  <h2 class="section-title">接入你的 AI，不锁定任何服务</h2>
+  <p class="section-desc">兼容所有大模型 API，本地云端都行，你的 Key 你做主。</p>
+
+  <div class="api-banner">
+    <div class="api-banner-text">
+      <h3>一次配置，全平台通用</h3>
+      <p>只需填入 Base URL、API Key 和模型名称，即可接入任意兼容服务。<br>密钥仅保存在本地浏览器，绝不上传。</p>
+    </div>
+    <div class="api-logos">
+      <div class="api-logo">DeepSeek</div>
+      <div class="api-logo">OpenAI</div>
+      <div class="api-logo">Ollama</div>
+      <div class="api-logo">通义千问</div>
+      <div class="api-logo">硅基流动</div>
+      <div class="api-logo">Groq</div>
+      <div class="api-logo">……</div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Quick Start ====== -->
+<section class="section" id="quickstart">
+  <div class="section-label">快速上手</div>
+  <h2 class="section-title">三步开始使用</h2>
+  <p class="section-desc">从安装到出结果，不超过 2 分钟。</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>安装扩展</h3>
+        <p>将项目文件夹加载到 Chrome（开发者模式 → 加载已解压的扩展），图标出现在工具栏。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>配置 API</h3>
+        <p>点击图标打开设置，填入你的 API 地址、密钥和模型名称（本地 Ollama 可不填密钥）。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>划词即用</h3>
+        <p>在任意网页选中文字，浮窗自动出现。点击翻译、总结、解释或朗读，结果即时显示。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Customization ====== -->
+<section class="section" id="customize">
+  <div class="section-label">深度定制</div>
+  <h2 class="section-title">你的工具栏，你说了算</h2>
+  <p class="section-desc">不只是预设按钮——自定义提示词、拖拽排序、朗读语音，打造专属划词工作流。</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon purple">✏️</div>
+      <h3>自定义按钮与提示词</h3>
+      <p>翻译、总结只是开始。创建"改写为正式语气"、"提取关键词"、"对比分析"……提示词用 <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:13px">{{text}}</code> 代表选中文字。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon green">🔀</div>
+      <h3>拖拽排序</h3>
+      <p>把最常用的按钮拖到前面，不常用的往后放。设置页直接拖拽，即时生效。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon amber">🗣️</div>
+      <h3>14 种语言智能朗读</h3>
+      <p>自动检测中/英/日/韩/法/德/西/俄/葡/意/荷/波/印尼/印地语，匹配最佳语音。设置母语加速，母语内容以 1.5x~3.0x 播放，其他语言保持正常语速。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Privacy ====== -->
+<section class="section" id="privacy">
+  <div class="section-label">隐私优先</div>
+  <h2 class="section-title">你的数据，只在你手里</h2>
+  <p class="section-desc"></p>
+
+  <div class="feature-grid" style="max-width:640px">
+    <div class="feature-card">
+      <div class="feature-icon green">🔒</div>
+      <h3>零数据收集</h3>
+      <p>不收集、不上传、不分析任何用户数据。API Key 存在浏览器本地 storage，AI 请求直接从你的浏览器发出。</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon blue">🛡️</div>
+      <h3>最小权限</h3>
+      <p>仅申请 storage 权限保存设置。网络请求仅在用户主动划词时发出，API 域名权限由用户按需授权。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Footer ====== -->
+<footer class="footer">
+  <p>AI 划词助手 &nbsp;·&nbsp; Chrome Extension</p>
+  <p style="margin-top:8px">Made with ❤️</p>
+</footer>
+
+</body>
+</html>

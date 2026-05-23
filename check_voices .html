@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Win11 神经网络语音检测</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+  h2 { color: #1a1a1a; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; background: #f0f0f0; border-bottom: 2px solid #ddd; }
+  td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .neural  { background: #d4edda; color: #155724; }
+  .local   { background: #cce5ff; color: #004085; }
+  .cloud   { background: #fff3cd; color: #856404; }
+  .missing { background: #f8d7da; color: #721c24; }
+  .tip { background: #e8f4fd; border-left: 4px solid #2196f3; padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 14px; line-height: 1.6; }
+  button { background: #0078d4; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #006bc1; }
+  #status { color: #888; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h2>🔊 Win11 神经网络语音检测</h2>
+
+<div class="card">
+  <button onclick="detect()">开始检测</button>
+  <span id="status">点击按钮检测当前浏览器可用的 TTS 语音</span>
+</div>
+
+<div id="result"></div>
+
+<script>
+// 必须含有这些词才算神经网络语音，避免把老版 Mark/Zira 误判
+const NEURAL_KEYWORDS = ['Natural', 'Online', 'Neural'];
+
+const WANT_LANGS = [
+  { lang: 'zh-CN', label: '中文（普通话）', voices: ['晓晓 Xiaoxiao','云希 Yunxi','晓伊 Xiaoyi','云健 Yunjian'] },
+  { lang: 'zh-TW', label: '中文（台湾）',   voices: ['曉臻 HsiaoChen','雲哲 YunJhe'] },
+  { lang: 'en-US', label: '英语（美国）',   voices: ['Jenny','Guy','Aria','Davis'] },
+  { lang: 'en-GB', label: '英语（英国）',   voices: ['Libby','Ryan','Sonia'] },
+  { lang: 'ja-JP', label: '日语',           voices: ['Nanami','Keita'] },
+  { lang: 'ko-KR', label: '韩语',           voices: ['SunHi','InJoon'] },
+];
+
+function isNeural(v) {
+  return NEURAL_KEYWORDS.some(k => v.name.includes(k));
+}
+
+function detect() {
+  document.getElementById('status').textContent = '检测中...';
+  // 部分浏览器需要延迟等语音列表加载
+  setTimeout(() => {
+    const voices = speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      document.getElementById('status').textContent = '语音列表为空，请稍后再试或刷新页面';
+      return;
+    }
+    render(voices);
+  }, 300);
+}
+
+// 页面加载时也尝试自动触发（onvoiceschanged 兼容）
+speechSynthesis.onvoiceschanged = () => {
+  const voices = speechSynthesis.getVoices();
+  if (voices.length > 0 && !document.getElementById('all-table')) render(voices);
+};
+
+function render(voices) {
+  document.getElementById('status').textContent = `共检测到 ${voices.length} 个语音`;
+
+  const neural = voices.filter(isNeural);
+  const local  = voices.filter(v => v.localService && !isNeural(v));
+  const cloud  = voices.filter(v => !v.localService && !isNeural(v));
+
+  let html = '';
+
+  // ── 摘要 ──
+  html += `<div class="card">
+    <b>摘要</b>：共 ${voices.length} 个语音　
+    <span class="tag neural">神经网络 ${neural.length}</span>　
+    <span class="tag local">本地旧版 ${local.length}</span>　
+    <span class="tag cloud">Google云端 ${cloud.length}</span>
+  </div>`;
+
+  // ── 神经网络语音 ──
+  if (neural.length > 0) {
+    html += `<div class="card"><b>✅ 已可用的神经网络语音（${neural.length} 个）</b>
+    <table><tr><th>名称</th><th>语言</th><th>来源</th></tr>`;
+    for (const v of neural) {
+      const src = v.localService ? '<span class="tag local">本地</span>' : '<span class="tag cloud">云端</span>';
+      html += `<tr><td>${v.name}</td><td>${v.lang}</td><td>${src}</td></tr>`;
+    }
+    html += '</table></div>';
+  } else {
+    html += `<div class="card"><div class="tip">
+      ⚠️ 未检测到任何神经网络语音。请按下方步骤安装。
+    </div></div>`;
+  }
+
+  // ── 缺失语言检测 ──
+  const missing = [];
+  for (const item of WANT_LANGS) {
+    const has = voices.some(v => v.lang === item.lang && isNeural(v));
+    if (!has) missing.push(item);
+  }
+
+  if (missing.length > 0) {
+    html += `<div class="card"><b>❌ 以下语言缺少神经网络语音</b>
+    <table><tr><th>语言</th><th>代码</th><th>推荐语音</th></tr>`;
+    for (const m of missing) {
+      html += `<tr><td>${m.label}</td><td>${m.lang}</td><td class="tag missing">${m.voices.join(' / ')}</td></tr>`;
+    }
+    html += `</table>
+    <div class="tip">
+      📥 安装方法：<br>
+      1. 打开 <b>Windows 设置 → 时间和语言 → 语言和地区</b><br>
+      2. 点击对应语言右侧 <b>…</b> → <b>语言选项</b><br>
+      3. 找到 <b>文字转语音</b> 一栏，点击 <b>下载</b><br>
+      4. 安装完成后<b>重启 Chrome</b>，再回来检测
+    </div></div>`;
+  } else {
+    html += `<div class="card"><div class="tip">✅ 常用语言的神经网络语音均已安装。</div></div>`;
+  }
+
+  // ── 全部语音列表 ──
+  html += `<div class="card"><b>全部语音列表</b>
+  <table id="all-table"><tr><th>索引</th><th>名称</th><th>语言</th><th>类型</th></tr>`;
+  for (let i = 0; i < voices.length; i++) {
+    const v = voices[i];
+    let tag = '';
+    if (isNeural(v))       tag = `<span class="tag neural">神经网络</span>`;
+    else if (v.localService) tag = `<span class="tag local">本地旧版</span>`;
+    else                   tag = `<span class="tag cloud">Google云端</span>`;
+    html += `<tr><td>${i}</td><td>${v.name}</td><td>${v.lang}</td><td>${tag}</td></tr>`;
+  }
+  html += '</table></div>';
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body>
+</html>

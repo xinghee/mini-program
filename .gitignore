@@ -1,0 +1,8 @@
+# 通用忽略規則
+node_modules/
+.env
+*.log
+dist/
+.DS_Store
+Thumbs.db
+*.tmp
