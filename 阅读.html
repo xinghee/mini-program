@@ -538,7 +538,76 @@
       document.body.style.backgroundColor = cfg.bg;
       document.body.style.color = cfg.text;
     }
-    applySettings();
+
+    // ── 存储 ──
+    const STORAGE_KEY_SETTINGS = 'pale_page_settings';
+    const STORAGE_KEY_ITEMS    = 'pale_page_items';
+
+    function saveSettings() {
+      try {
+        localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(cfg));
+      } catch (e) { /* storage full or unavailable */ }
+    }
+
+    function saveItems() {
+      try {
+        localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(markdownItems));
+      } catch (e) { /* storage full or unavailable */ }
+    }
+
+    function loadSettings() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          Object.assign(cfg, parsed);
+          // 将存储值同步到 UI 控件
+          // 字体
+          document.querySelectorAll('.font-opt').forEach(b => {
+            b.classList.toggle('active', b.dataset.font === cfg.font);
+          });
+          // 字号
+          fontSizeSlider.value = cfg.fontSize;
+          fontSizeVal.textContent = cfg.fontSize + 'px';
+          updateFill(fontSizeSlider);
+          // 行距
+          lineHeightSlider.value = cfg.lineHeight;
+          lineHeightVal.textContent = cfg.lineHeight.toString();
+          updateFill(lineHeightSlider);
+          // 阅读宽度
+          widthSlider.value = cfg.readingWidth;
+          widthVal.textContent = cfg.readingWidth + 'ch';
+          updateFill(widthSlider);
+          // 颜色主题 -> 高亮匹配的 swatch
+          document.querySelectorAll('.theme-swatch').forEach(s => {
+            s.classList.toggle('active', s.dataset.bg === cfg.bg && s.dataset.text === cfg.text);
+          });
+          document.getElementById('bgColorPicker').value   = cfg.bg;
+          document.getElementById('textColorPicker').value = cfg.text;
+          // 朗读速度
+          speechRateSlider.value = cfg.speechRate;
+          const disp = cfg.speechRate % 1 === 0
+            ? cfg.speechRate.toFixed(1)
+            : cfg.speechRate.toFixed(2).replace(/0+$/, '');
+          speechRateVal.textContent = disp + '×';
+          updateFill(speechRateSlider);
+        }
+      } catch (e) { /* ignore corrupt data */ }
+      applySettings();
+    }
+
+    function loadItems() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_ITEMS);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            markdownItems = parsed;
+          }
+        }
+      } catch (e) { /* ignore corrupt data */ }
+      render();
+    }
 
     // ── 滑块填充辅助 ──
     function updateFill(slider) {
@@ -553,6 +622,7 @@
         btn.classList.add('active');
         cfg.font = btn.dataset.font;
         applySettings();
+        saveSettings();
       });
     });
 
@@ -564,6 +634,7 @@
       fontSizeVal.textContent = cfg.fontSize + 'px';
       updateFill(fontSizeSlider);
       applySettings();
+      saveSettings();
     });
     updateFill(fontSizeSlider);
 
@@ -575,6 +646,7 @@
       lineHeightVal.textContent = cfg.lineHeight;
       updateFill(lineHeightSlider);
       applySettings();
+      saveSettings();
     });
     updateFill(lineHeightSlider);
 
@@ -586,6 +658,7 @@
       widthVal.textContent = cfg.readingWidth + 'ch';
       updateFill(widthSlider);
       applySettings();
+      saveSettings();
     });
     updateFill(widthSlider);
 
@@ -599,6 +672,7 @@
         document.getElementById('bgColorPicker').value   = cfg.bg;
         document.getElementById('textColorPicker').value = cfg.text;
         applySettings();
+        saveSettings();
       });
     });
 
@@ -607,11 +681,13 @@
       cfg.bg = e.target.value;
       document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       applySettings();
+      saveSettings();
     });
     document.getElementById('textColorPicker').addEventListener('input', e => {
       cfg.text = e.target.value;
       document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       applySettings();
+      saveSettings();
     });
 
     // ── 朗读速度 ──
@@ -624,8 +700,12 @@
         : cfg.speechRate.toFixed(2).replace(/0+$/, '');
       speechRateVal.textContent = disp + '×';
       updateFill(speechRateSlider);
+      saveSettings();
     });
     updateFill(speechRateSlider);
+
+    // 加载存储的设置和条目（必须放在所有 DOM 引用之后）
+    loadSettings();
 
     // ── FAB 面板切换 ──
     const fabBtn       = document.getElementById('fabBtn');
@@ -775,6 +855,7 @@
           speechSynthesis.cancel();
           markdownItems.splice(i, 1);
           render();
+          saveItems();
         });
 
         header.append(idx, readBtn, delBtn);
@@ -797,6 +878,7 @@
       }
       markdownItems.push({ rawText: t });
       render();
+      saveItems();
       closeAll();
       textInput.value = '';
     }
@@ -807,7 +889,8 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); addItem(textInput.value); }
     });
 
-    render();
+    // 加载存储的条目（会调用 render）
+    loadItems();
     console.log('✨ 淡黄页已启动。Ctrl+Enter 快速添加。');
   })();
   </script>
